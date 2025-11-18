@@ -74,7 +74,7 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-12 px-4">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 to-slate-100 py-12 px-4">
       {/* Toast Container */}
       <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">
         {toasts.map((toast) => (
@@ -87,7 +87,7 @@ function App() {
             }`}
           >
             <CheckCircle
-              className={`w-5 h-5 flex-shrink-0 ${
+              className={`w-5 h-5 shrink-0 ${
                 toast.type === "success" ? "text-emerald-600" : "text-red-600"
               }`}
             />
