@@ -18,18 +18,20 @@ function App() {
   const [hiding, setHiding] = useState(false);
   const [toasts, setToasts] = useState([]);
 
+  // Toast Notification
   const showToast = (message, type = "success") => {
     const id = Date.now();
-    setToasts((prev) => [...prev, { id, message, type }]);
+    setToasts((p) => [...p, { id, message, type }]);
     setTimeout(() => {
-      setToasts((prev) => prev.filter((toast) => toast.id !== id));
+      setToasts((p) => p.filter((t) => t.id !== id));
     }, 3000);
   };
 
   const removeToast = (id) => {
-    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+    setToasts((p) => p.filter((t) => t.id !== id));
   };
 
+  // Fetch Twitter Comments
   useEffect(() => {
     fetch("http://localhost:8000/api/comments/")
       .then(async (res) => {
@@ -42,10 +44,11 @@ function App() {
         const data = await res.json();
         const all = data.comments || [];
 
-        const cleaned = all.map((c) => {
-          const cleanedText = c.text.replace(/^@\S+\s*/, "");
-          return { ...c, cleanedText };
-        });
+        // Clean text (@username removed)
+        const cleaned = all.map((c) => ({
+          ...c,
+          cleanedText: c.text.replace(/^@\S+\s*/, ""),
+        }));
 
         setRedFlags(cleaned.filter((c) => c.cleanedText.length > 10));
         setGreenFlags(cleaned.filter((c) => c.cleanedText.length <= 10));
@@ -64,6 +67,7 @@ function App() {
       });
   }, []);
 
+  // Hide All Red Flag Comments (Backend + Premium Support)
   const hideAll = () => {
     setHiding(true);
 
@@ -86,10 +90,11 @@ function App() {
 
         const data = await res.json();
 
-        const cleaned = data.hided_comments.map((c) => {
-          const cleanedText = c.text.replace(/^@\S+\s*/, "");
-          return { ...c, cleanedText };
-        });
+        // Clean safe/hided comments again
+        const cleaned = data.hided_comments.map((c) => ({
+          ...c,
+          cleanedText: c.text.replace(/^@\S+\s*/, ""),
+        }));
 
         showToast("Red flag comments hidden!", "success");
 
@@ -105,6 +110,7 @@ function App() {
       .finally(() => setHiding(false));
   };
 
+  // Restore Comments
   const showHidden = () => {
     setRedFlags([...hiddenComments]);
     setHiddenComments([]);
@@ -146,7 +152,9 @@ function App() {
         ))}
       </div>
 
+      {/* Main Content */}
       <div className="max-w-4xl mx-auto">
+        {/* Header */}
         <div className="text-center mb-12">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-500 rounded-2xl mb-4 shadow-lg">
             <Shield className="w-8 h-8 text-white" />
@@ -159,6 +167,7 @@ function App() {
           </p>
         </div>
 
+        {/* Loading Screen */}
         {loading && (
           <div className="flex flex-col items-center justify-center py-20">
             <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-4" />
@@ -168,8 +177,10 @@ function App() {
           </div>
         )}
 
+        {/* Comment Panels */}
         {!loading && (
           <div className="grid md:grid-cols-2 gap-6">
+            {/* Safe Comments */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
               <div className="flex items-center gap-3 mb-5">
                 <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
@@ -203,6 +214,7 @@ function App() {
               </div>
             </div>
 
+            {/* Red Flags */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
               <div className="flex items-center gap-3 mb-5">
                 <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
