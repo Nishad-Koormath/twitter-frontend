@@ -1,16 +1,92 @@
-# React + Vite
+🌐 Comment Classifier Frontend (React + Tailwind CSS v4)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This repository contains the frontend UI for the Comment Classifier project, built for the Incramania Pvt Ltd Python Full Stack Developer Task.
 
-Currently, two official plugins are available:
+The frontend fetches comments from the Django API, classifies them, hides red-flag comments, and provides a clean, responsive UI.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+🚀 Tech Stack
+React (Vite)
+Tailwind CSS v4 (Engine v4 — no config needed)
+Lucide React Icons
+Fetch API
 
-## React Compiler
+📌 Features
 
-The React Compiler is currently not compatible with SWC. See [this issue](https://github.com/vitejs/vite-plugin-react/issues/428) for tracking the progress.
+✔ Fetch comments from backend
+✔ Classify comments based on length
+✔ Red Flag (length > 10)
+✔ Green Flag (length ≤ 10)
+✔ Hide All red-flag comments (API simulated)
+✔ Restore hidden comments
+✔ Toast notifications
+✔ Smooth transitions & icons
+✔ Tailwind CSS modern UI
 
-## Expanding the ESLint configuration
+📁 Project Structure
+frontend/
+│── index.html
+│── vite.config.js
+│── package.json
+│── src/
+     ├── App.jsx
+     ├── main.jsx
+     ├── index.css
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+⚙️ Setup & Installation
+1️⃣ Install Dependencies
+npm install
+
+2️⃣ Install Tailwind v4
+npm install tailwindcss@next
+
+3️⃣ Add Tailwind Import
+
+src/index.css:
+
+@import "tailwindcss";
+
+4️⃣ Start Project
+npm run dev
+
+
+Frontend runs at:
+👉 http://localhost:5173/
+
+Backend must be running at:
+👉 http://localhost:8000/
+
+🔗 API Endpoints Used
+Endpoint	Method	Purpose
+/api/comments/	GET	Fetch all comments
+/api/hide-red-flags/	POST	Hide red-flag comments
+🧠 Approach
+1️⃣ Fetch comments on load
+
+Split into:
+
+greenFlags → text length ≤ 10
+
+redFlags → text length > 10
+
+2️⃣ Hide All button
+
+Calls /api/hide-red-flags/
+
+Moves red flags into hiddenComments
+
+Clears red flags from UI
+
+Shows toast feedback
+
+3️⃣ Show Hidden
+
+Restores previously hidden comments.
+
+🎨 UI Highlights
+
+Clean card-based layout
+Tailwind CSS v4 utilities
+Icons using lucide-react
+Toast alerts for success/error
+Loading spinners
+Smooth fade-in animation
