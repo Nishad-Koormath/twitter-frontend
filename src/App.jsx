@@ -32,33 +32,71 @@ function App() {
 
   useEffect(() => {
     fetch("http://localhost:8000/api/comments/")
-      .then((res) => res.json())
-      .then((data) => {
-        const all = data.comments;
-        setComments(all);
-        setRedFlags(all.filter((c) => c.text.length > 10));
-        setGreenFlags(all.filter((c) => c.text.length <= 10));
+      .then(async (res) => {
+        if (res.status === 429) {
+          showToast("Twitter rate limit reached. Try again later.", "error");
+          setLoading(false);
+          return;
+        }
+
+        const data = await res.json();
+        const all = data.comments || [];
+
+        const cleaned = all.map((c) => {
+          const cleanedText = c.text.replace(/^@\S+\s*/, "");
+          return { ...c, cleanedText };
+        });
+
+        setRedFlags(cleaned.filter((c) => c.cleanedText.length > 10));
+        setGreenFlags(cleaned.filter((c) => c.cleanedText.length <= 10));
+        setComments(cleaned);
+
+        if (cleaned.length === 0) {
+          showToast("No replies found on your tweet!", "error");
+        }
+
         setLoading(false);
       })
       .catch((err) => {
         console.error(err);
+        showToast("Failed to fetch comments from Twitter", "error");
         setLoading(false);
       });
   }, []);
 
   const hideAll = () => {
     setHiding(true);
+
+    const rawComments = comments.map((c) => ({
+      id: c.id,
+      text: c.text,
+    }));
+
     fetch("http://localhost:8000/api/hide-red-flags/", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ comments: rawComments }),
     })
-      .then((res) => res.json())
-      .then((data) => {
-        showToast("Red flag comments hidden successfully!", "success");
+      .then(async (res) => {
+        if (res.status === 429) {
+          showToast("Rate limit hit while hiding. Try again later.", "error");
+          setHiding(false);
+          return;
+        }
+
+        const data = await res.json();
+
+        const cleaned = data.hided_comments.map((c) => {
+          const cleanedText = c.text.replace(/^@\S+\s*/, "");
+          return { ...c, cleanedText };
+        });
+
+        showToast("Red flag comments hidden!", "success");
+
         setHiddenComments([...redFlags]);
         setRedFlags([]);
-        setGreenFlags(data.hided_comments);
-        setComments(data.hided_comments);
+        setGreenFlags(cleaned);
+        setComments(cleaned);
       })
       .catch((err) => {
         console.error(err);
@@ -75,7 +113,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-linear-to-br from-slate-50 to-slate-100 py-12 px-4">
-      {/* Toast Container */}
+      {/* Toasts */}
       <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">
         {toasts.map((toast) => (
           <div
@@ -87,7 +125,7 @@ function App() {
             }`}
           >
             <CheckCircle
-              className={`w-5 h-5 shrink-0 ${
+              className={`w-5 h-5 ${
                 toast.type === "success" ? "text-emerald-600" : "text-red-600"
               }`}
             />
@@ -100,24 +138,15 @@ function App() {
             </p>
             <button
               onClick={() => removeToast(toast.id)}
-              className={`p-1 rounded-lg transition-colors ${
-                toast.type === "success"
-                  ? "hover:bg-emerald-100"
-                  : "hover:bg-red-100"
-              }`}
+              className="p-1 rounded-lg hover:bg-slate-100"
             >
-              <X
-                className={`w-4 h-4 ${
-                  toast.type === "success" ? "text-emerald-600" : "text-red-600"
-                }`}
-              />
+              <X className="w-4 h-4 text-slate-600" />
             </button>
           </div>
         ))}
       </div>
 
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
         <div className="text-center mb-12">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-500 rounded-2xl mb-4 shadow-lg">
             <Shield className="w-8 h-8 text-white" />
@@ -125,20 +154,23 @@ function App() {
           <h1 className="text-4xl font-bold text-slate-800 mb-2">
             Comment Classifier
           </h1>
+          <p className="text-slate-500">
+            Shows real replies from your real Twitter post
+          </p>
         </div>
 
-        {/* Loading State */}
         {loading && (
           <div className="flex flex-col items-center justify-center py-20">
             <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-4" />
-            <p className="text-slate-600 text-lg">Analyzing comments...</p>
+            <p className="text-slate-600 text-lg">
+              Fetching real replies from Twitter…
+            </p>
           </div>
         )}
 
         {!loading && (
           <div className="grid md:grid-cols-2 gap-6">
-            {/* Green Flags Section */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
               <div className="flex items-center gap-3 mb-5">
                 <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
                   <CheckCircle className="w-5 h-5 text-emerald-600" />
@@ -156,23 +188,22 @@ function App() {
               <div className="space-y-3 max-h-96 overflow-y-auto">
                 {greenFlags.length === 0 ? (
                   <p className="text-slate-400 text-center py-8">
-                    No safe comments found
+                    No short comments found
                   </p>
                 ) : (
                   greenFlags.map((c) => (
                     <div
                       key={c.id}
-                      className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-slate-700 hover:bg-emerald-100 transition-colors"
+                      className="p-4 rounded-xl bg-emerald-50 border border-emerald-200"
                     >
-                      {c.text}
+                      {c.cleanedText}
                     </div>
                   ))
                 )}
               </div>
             </div>
 
-            {/* Red Flags Section */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
               <div className="flex items-center gap-3 mb-5">
                 <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
                   <Flag className="w-5 h-5 text-red-600" />
@@ -190,15 +221,15 @@ function App() {
               <div className="space-y-3 max-h-96 overflow-y-auto mb-4">
                 {redFlags.length === 0 ? (
                   <p className="text-slate-400 text-center py-8">
-                    No flagged comments
+                    No long comments found
                   </p>
                 ) : (
                   redFlags.map((c) => (
                     <div
                       key={c.id}
-                      className="p-4 rounded-xl bg-red-50 border border-red-200 text-slate-700 hover:bg-red-100 transition-colors"
+                      className="p-4 rounded-xl bg-red-50 border border-red-200"
                     >
-                      {c.text}
+                      {c.cleanedText}
                     </div>
                   ))
                 )}
@@ -208,12 +239,12 @@ function App() {
                 <button
                   onClick={hideAll}
                   disabled={hiding}
-                  className="w-full bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
+                  className="w-full bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white py-3 rounded-xl font-medium flex items-center justify-center gap-2"
                 >
                   {hiding ? (
                     <>
                       <Loader2 className="w-5 h-5 animate-spin" />
-                      Hiding...
+                      Hiding…
                     </>
                   ) : (
                     <>
@@ -227,7 +258,7 @@ function App() {
               {hiddenComments.length > 0 && (
                 <button
                   onClick={showHidden}
-                  className="w-full bg-slate-600 hover:bg-slate-700 text-white py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md mt-3"
+                  className="w-full bg-slate-600 hover:bg-slate-700 text-white py-3 rounded-xl font-medium flex items-center justify-center gap-2 mt-3"
                 >
                   <Eye className="w-5 h-5" />
                   Show Hidden Comments ({hiddenComments.length})
