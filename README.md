@@ -1,92 +1,119 @@
-🌐 Comment Classifier Frontend (React + Tailwind CSS v4)
+Frontend – Twitter Comment Classifier (React + Vite + Tailwind v4)
 
-This repository contains the frontend UI for the Comment Classifier project, built for the Incramania Pvt Ltd Python Full Stack Developer Task.
+This is the frontend UI for the Twitter Comment Classifier project.
+It connects to the Django backend to fetch real replies from your Twitter post, classifies them, and allows hiding red-flag comments.
 
-The frontend fetches comments from the Django API, classifies them, hides red-flag comments, and provides a clean, responsive UI.
-
-🚀 Tech Stack
-React (Vite)
-Tailwind CSS v4 (Engine v4 — no config needed)
-Lucide React Icons
-Fetch API
 
 📌 Features
+✅ Fetches Real Twitter Replies
+Automatically loads replies from the backend API
+Cleans tweet text by removing @username mention
+Classifies comments into:
+Green Flag (≤ 10 chars)
+Red Flag (> 10 chars)
 
-✔ Fetch comments from backend
-✔ Classify comments based on length
-✔ Red Flag (length > 10)
-✔ Green Flag (length ≤ 10)
-✔ Hide All red-flag comments (API simulated)
-✔ Restore hidden comments
-✔ Toast notifications
-✔ Smooth transitions & icons
-✔ Tailwind CSS modern UI
+✅ Hide All Red Flag Comments
+Sends raw comments to backend
+Backend simulates hide action
+UI updates instantly
+Can restore hidden comments
 
-📁 Project Structure
+✅ Modern UI with Tailwind v4
+Responsive card layout
+Smooth animations
+lucide-react icons
+Clean spacing & shadows
+
+✅ Toast Notifications
+Success & error messages
+Auto-dismiss animations
+Visible rate-limit warnings
+
+✅ Twitter Rate Limit Handling
+Shows toast when backend returns 429
+No UI crash
+Dummy mode supported for testing
+
+🛠️ Tech Stack
+React (Vite)
+Tailwind CSS v4
+lucide-react
+Fetch API
+JavaScript ES6
+
+📂 Folder Structure
 frontend/
-│── index.html
-│── vite.config.js
-│── package.json
-│── src/
-     ├── App.jsx
-     ├── main.jsx
-     ├── index.css
+  ├── src/
+  │   ├── App.jsx
+  │   ├── main.jsx
+  │   └── index.css
+  ├── vite.config.js
+  ├── package.json
+  └── tailwind.config.js
 
-⚙️ Setup & Installation
-1️⃣ Install Dependencies
+🚀 Setup Instructions
+1️⃣ Install dependencies
 npm install
 
-2️⃣ Install Tailwind v4
-npm install tailwindcss@next
-
-3️⃣ Add Tailwind Import
-
-src/index.css:
-
-@import "tailwindcss";
-
-4️⃣ Start Project
+2️⃣ Run development server
 npm run dev
 
+Frontend will run at:
+http://localhost:5173
+3️⃣ Ensure backend is running at:
+http://localhost:8000
 
-Frontend runs at:
-👉 http://localhost:5173/
+🔌 API Configuration (already inside App.jsx)
+Fetch comments:
+http://localhost:8000/api/comments/
 
-Backend must be running at:
-👉 http://localhost:8000/
+Hide red flags:
+http://localhost:8000/api/hide-red-flags/
 
-🔗 API Endpoints Used
-Endpoint	Method	Purpose
-/api/comments/	GET	Fetch all comments
-/api/hide-red-flags/	POST	Hide red-flag comments
-🧠 Approach
-1️⃣ Fetch comments on load
 
-Split into:
+📄 Core Logic Example (App.jsx)
+useEffect(() => {
+  fetch("http://localhost:8000/api/comments/")
+    .then(async (res) => {
+      if (res.status === 429) {
+        showToast("Twitter rate limit reached. Try again later.", "error");
+        setLoading(false);
+        return;
+      }
 
-greenFlags → text length ≤ 10
+      const data = await res.json();
+      const all = data.comments || [];
 
-redFlags → text length > 10
+      // Clean reply text
+      const cleaned = all.map((c) => {
+        const cleanedText = c.text.replace(/^@\w+\s*/, "");
+        return { ...c, cleanedText };
+      });
 
-2️⃣ Hide All button
+      setRedFlags(cleaned.filter((c) => c.cleanedText.length > 10));
+      setGreenFlags(cleaned.filter((c) => c.cleanedText.length <= 10));
+      setComments(cleaned);
 
-Calls /api/hide-red-flags/
+      if (cleaned.length === 0) {
+        showToast("No replies found on your tweet!", "error");
+      }
 
-Moves red flags into hiddenComments
-
-Clears red flags from UI
-
-Shows toast feedback
-
-3️⃣ Show Hidden
-
-Restores previously hidden comments.
+      setLoading(false);
+    })
+    .catch(() => {
+      showToast("Failed to fetch comments from Twitter", "error");
+      setLoading(false);
+    });
+}, []);
 
 🎨 UI Highlights
 
-Clean card-based layout
-Tailwind CSS v4 utilities
-Icons using lucide-react
-Toast alerts for success/error
-Loading spinners
-Smooth fade-in animation
+Tailwind v4 utility classes
+
+Lucide icons (Shield, Flag, EyeOff, Eye, Loader2)
+
+Smooth list transitions
+
+Animated toast container
+
+Dark text contrast for readability
