@@ -90,7 +90,7 @@ function App() {
 
   // ==== LOGIN HANDLER ====
   const loginWithTwitter = () => {
-    window.open("http://localhost:8000/api/auth/login/", "_blank");
+    window.location.href = "http://localhost:8000/api/auth/login/";
   };
 
   // ==== REAL HIDE USING USER OAUTH TOKEN ====
