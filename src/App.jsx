@@ -6,6 +6,7 @@ import {
   Loader2,
   EyeOff,
   Eye,
+  LogIn,
   X,
 } from "lucide-react";
 
@@ -18,7 +19,10 @@ function App() {
   const [hiding, setHiding] = useState(false);
   const [toasts, setToasts] = useState([]);
 
-  // Toast Notification
+  // Track OAuth Login State
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  // Toasts
   const showToast = (message, type = "success") => {
     const id = Date.now();
     setToasts((p) => [...p, { id, message, type }]);
@@ -31,12 +35,30 @@ function App() {
     setToasts((p) => p.filter((t) => t.id !== id));
   };
 
-  // Fetch Twitter Comments
+  // Detect OAuth Callback
+  useEffect(() => {
+    if (window.location.search.includes("code=")) {
+      showToast("Twitter login successful!", "success");
+      setIsLoggedIn(true);
+    } else {
+      // Check session (backend will validate)
+      fetch("http://localhost:8000/api/tweet/hide/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reply_id: "test" }), // test
+      }).then((res) => {
+        if (res.status === 401) setIsLoggedIn(false);
+        else setIsLoggedIn(true);
+      });
+    }
+  }, []);
+
+  // Fetch Twitter Replies
   useEffect(() => {
     fetch("http://localhost:8000/api/comments/")
       .then(async (res) => {
         if (res.status === 429) {
-          showToast("Twitter rate limit reached. Try again later.", "error");
+          showToast("Twitter rate limit reached.", "error");
           setLoading(false);
           return;
         }
@@ -44,7 +66,6 @@ function App() {
         const data = await res.json();
         const all = data.comments || [];
 
-        // Clean text (@username removed)
         const cleaned = all.map((c) => ({
           ...c,
           cleanedText: c.text.replace(/^@\S+\s*/, ""),
@@ -55,62 +76,55 @@ function App() {
         setComments(cleaned);
 
         if (cleaned.length === 0) {
-          showToast("No replies found on your tweet!", "error");
+          showToast("No replies found.", "error");
         }
 
         setLoading(false);
       })
       .catch((err) => {
         console.error(err);
-        showToast("Failed to fetch comments from Twitter", "error");
+        showToast("Failed to fetch comments.", "error");
         setLoading(false);
       });
   }, []);
 
-  // Hide All Red Flag Comments (Backend + Premium Support)
+  // ==== LOGIN HANDLER ====
+  const loginWithTwitter = () => {
+    window.open("http://localhost:8000/api/auth/login/", "_blank");
+  };
+
+  // ==== REAL HIDE USING USER OAUTH TOKEN ====
   const hideAll = () => {
+    if (!isLoggedIn) {
+      showToast("Login with Twitter to hide comments.", "error");
+      return;
+    }
+
     setHiding(true);
 
-    const rawComments = comments.map((c) => ({
-      id: c.id,
-      text: c.text,
-    }));
-
-    fetch("http://localhost:8000/api/hide-red-flags/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ comments: rawComments }),
-    })
-      .then(async (res) => {
-        if (res.status === 429) {
-          showToast("Rate limit hit while hiding. Try again later.", "error");
-          setHiding(false);
-          return;
-        }
-
-        const data = await res.json();
-
-        // Clean safe/hided comments again
-        const cleaned = data.hided_comments.map((c) => ({
-          ...c,
-          cleanedText: c.text.replace(/^@\S+\s*/, ""),
-        }));
-
-        showToast("Red flag comments hidden!", "success");
+    Promise.all(
+      redFlags.map((comment) =>
+        fetch("http://localhost:8000/api/tweet/hide/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reply_id: comment.id }),
+        }).then((res) => res.json())
+      )
+    )
+      .then(() => {
+        showToast("Red flag comments hidden on Twitter!", "success");
 
         setHiddenComments([...redFlags]);
         setRedFlags([]);
-        setGreenFlags(cleaned);
-        setComments(cleaned);
       })
       .catch((err) => {
         console.error(err);
-        showToast("Failed to hide comments", "error");
+        showToast("Failed to hide comments.", "error");
       })
       .finally(() => setHiding(false));
   };
 
-  // Restore Comments
+  // Restore locally
   const showHidden = () => {
     setRedFlags([...hiddenComments]);
     setHiddenComments([]);
@@ -119,12 +133,13 @@ function App() {
 
   return (
     <div className="min-h-screen bg-linear-to-br from-slate-50 to-slate-100 py-12 px-4">
+
       {/* Toasts */}
       <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`flex items-center gap-3 p-4 rounded-xl shadow-lg border animate-in slide-in-from-top duration-300 ${
+            className={`flex items-center gap-3 p-4 rounded-xl shadow-lg border ${
               toast.type === "success"
                 ? "bg-emerald-50 border-emerald-200"
                 : "bg-red-50 border-red-200"
@@ -142,121 +157,107 @@ function App() {
             >
               {toast.message}
             </p>
-            <button
-              onClick={() => removeToast(toast.id)}
-              className="p-1 rounded-lg hover:bg-slate-100"
-            >
+            <button onClick={() => removeToast(toast.id)}>
               <X className="w-4 h-4 text-slate-600" />
             </button>
           </div>
         ))}
       </div>
 
-      {/* Main Content */}
+      {/* Main Container */}
       <div className="max-w-4xl mx-auto">
+
         {/* Header */}
-        <div className="text-center mb-12">
+        <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-500 rounded-2xl mb-4 shadow-lg">
             <Shield className="w-8 h-8 text-white" />
           </div>
+
           <h1 className="text-4xl font-bold text-slate-800 mb-2">
             Comment Classifier
           </h1>
           <p className="text-slate-500">
-            Shows real replies from your real Twitter post
+            Shows replies from your Twitter post
           </p>
+
+          {/* LOGIN BUTTON */}
+          <div className="mt-4">
+            {!isLoggedIn ? (
+              <button
+                onClick={loginWithTwitter}
+                className="bg-slate-800 hover:bg-slate-900 text-white px-5 py-2 rounded-xl flex items-center mx-auto gap-2"
+              >
+                <LogIn className="w-5 h-5" />
+                Login with Twitter
+              </button>
+            ) : (
+              <p className="text-sm text-emerald-600 font-medium">
+                ✅ Logged in with Twitter
+              </p>
+            )}
+          </div>
         </div>
 
-        {/* Loading Screen */}
+        {/* Loading */}
         {loading && (
-          <div className="flex flex-col items-center justify-center py-20">
+          <div className="flex flex-col items-center py-20">
             <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-4" />
             <p className="text-slate-600 text-lg">
-              Fetching real replies from Twitter…
+              Fetching replies…
             </p>
           </div>
         )}
 
-        {/* Comment Panels */}
+        {/* Content */}
         {!loading && (
           <div className="grid md:grid-cols-2 gap-6">
             {/* Safe Comments */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="bg-white rounded-2xl shadow-sm border p-6">
               <div className="flex items-center gap-3 mb-5">
-                <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
-                  <CheckCircle className="w-5 h-5 text-emerald-600" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-semibold text-slate-800">
-                    Safe Comments
-                  </h2>
-                  <p className="text-sm text-slate-500">
-                    {greenFlags.length} approved
-                  </p>
-                </div>
+                <CheckCircle className="w-6 h-6 text-emerald-600" />
+                <h2 className="text-xl font-semibold">Safe Comments</h2>
               </div>
 
               <div className="space-y-3 max-h-96 overflow-y-auto">
-                {greenFlags.length === 0 ? (
-                  <p className="text-slate-400 text-center py-8">
-                    No short comments found
-                  </p>
-                ) : (
-                  greenFlags.map((c) => (
-                    <div
-                      key={c.id}
-                      className="p-4 rounded-xl bg-emerald-50 border border-emerald-200"
-                    >
-                      {c.cleanedText}
-                    </div>
-                  ))
-                )}
+                {greenFlags.map((c) => (
+                  <div
+                    key={c.id}
+                    className="p-4 rounded-xl bg-emerald-50 border border-emerald-200"
+                  >
+                    {c.cleanedText}
+                  </div>
+                ))}
               </div>
             </div>
 
             {/* Red Flags */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="bg-white rounded-2xl shadow-sm border p-6">
               <div className="flex items-center gap-3 mb-5">
-                <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
-                  <Flag className="w-5 h-5 text-red-600" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-semibold text-slate-800">
-                    Flagged Comments
-                  </h2>
-                  <p className="text-sm text-slate-500">
-                    {redFlags.length} need review
-                  </p>
-                </div>
+                <Flag className="w-6 h-6 text-red-600" />
+                <h2 className="text-xl font-semibold">Flagged Comments</h2>
               </div>
 
               <div className="space-y-3 max-h-96 overflow-y-auto mb-4">
-                {redFlags.length === 0 ? (
-                  <p className="text-slate-400 text-center py-8">
-                    No long comments found
-                  </p>
-                ) : (
-                  redFlags.map((c) => (
-                    <div
-                      key={c.id}
-                      className="p-4 rounded-xl bg-red-50 border border-red-200"
-                    >
-                      {c.cleanedText}
-                    </div>
-                  ))
-                )}
+                {redFlags.map((c) => (
+                  <div
+                    key={c.id}
+                    className="p-4 rounded-xl bg-red-50 border border-red-200"
+                  >
+                    {c.cleanedText}
+                  </div>
+                ))}
               </div>
 
               {redFlags.length > 0 && (
                 <button
                   onClick={hideAll}
                   disabled={hiding}
-                  className="w-full bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white py-3 rounded-xl font-medium flex items-center justify-center gap-2"
+                  className="w-full bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white py-3 rounded-xl flex items-center justify-center gap-2"
                 >
                   {hiding ? (
                     <>
                       <Loader2 className="w-5 h-5 animate-spin" />
-                      Hiding…
+                      Hiding on Twitter…
                     </>
                   ) : (
                     <>
@@ -270,10 +271,9 @@ function App() {
               {hiddenComments.length > 0 && (
                 <button
                   onClick={showHidden}
-                  className="w-full bg-slate-600 hover:bg-slate-700 text-white py-3 rounded-xl font-medium flex items-center justify-center gap-2 mt-3"
+                  className="w-full bg-slate-700 text-white py-3 rounded-xl mt-3"
                 >
-                  <Eye className="w-5 h-5" />
-                  Show Hidden Comments ({hiddenComments.length})
+                  Restore Hidden Comments ({hiddenComments.length})
                 </button>
               )}
             </div>
